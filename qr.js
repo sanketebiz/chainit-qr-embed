@@ -117,7 +117,8 @@ options = {
       GET: "GET",
     };
     const DEFAULT_API_BASE_URL =
-      "https://production-bit-core-microservices.chainit.online";
+      "https://develop-bit-core-microservices.pairedasset.com";
+      // "https://production-bit-core-microservices.chainit.online";
     const GENERATE_QR_CODE_ENDPOINT = "/users/v1/age-verification";
     const STATES = {
       WaitingForScan: "WaitingForScan",
