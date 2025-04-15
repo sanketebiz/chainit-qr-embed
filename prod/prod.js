@@ -85,29 +85,31 @@
 
   //DOCUMENTATION
   /*
-REQUIRED CONFIGURATION PROPS (KEY: TYPE - DESCRIPTION)
+  REQUIRED CONFIGURATION PROPS (KEY: TYPE - DESCRIPTION)
   apiKey: string - used to generate the qr code.
   qrContainerSelector: string - selector to display QR code.
+  logContainerSelector: string - selector to display logs [OPTIONAL].
   onVerificationSuccess: function - callback function to perform actions after a success verification
   onVerificationFailure: function - callback function to perform actions after a failure in endepoint call
   onVerificationScanning: function - callback function to perform actions when QR code is being scanned
   onVerificationRejectedByUser: function - callback function to perform actions after the user is rejected by user permissions
   onVerificationRejectedByRequirements: function - callback function to perform actions after user is rejected by requirements in host rules
   onVerificationTimeout: function - callback function to perform actions after qr code timeout expires
-*/
+  */
   /*
-OPTIONS TEMPLATE
-options = {
-apiKey: 'HERE_YOUR API_KEY',
-qrContainerSelector: 'HERE_SELECTOR_FOR_QR_CONTAINER',
-onVerificationSuccess: 'HERE_ON_SUCCESS_FUNCTION',
-onVerificationFailure: 'HERE_ON_FAILURE_FUNCTION',
-onVerificationScanning: 'HERE_ON_SCANNNING_FUNCTION',
-onVerificationRejectedByUser: 'HERE_ON_REJECTCTION_BY_USER_FUNCTION',
-onVerificationRejectedByRequirements: 'HERE_ON_REJECTION_BY_REQUIREMENTS_FUNCTION',
-onVerificationTimeout: 'HERE_ON_QR_TIMEOUT_FUNCTION'
-};
-*/
+  OPTIONS TEMPLATE
+  options = {
+  apiKey: 'HERE_YOUR API_KEY',
+  qrContainerSelector: 'HERE_SELECTOR_FOR_QR_CONTAINER',
+  logContainerSelector: 'HERE_SELECTOR_FOR_LOG_CONTAINER',
+  onVerificationSuccess: 'HERE_ON_SUCCESS_FUNCTION',
+  onVerificationFailure: 'HERE_ON_FAILURE_FUNCTION',
+  onVerificationScanning: 'HERE_ON_SCANNNING_FUNCTION',
+  onVerificationRejectedByUser: 'HERE_ON_REJECTCTION_BY_USER_FUNCTION',
+  onVerificationRejectedByRequirements: 'HERE_ON_REJECTION_BY_REQUIREMENTS_FUNCTION',
+  onVerificationTimeout: 'HERE_ON_QR_TIMEOUT_FUNCTION'
+  };
+  */
   const ageVerificationModule = (function () {
     const DEFAULT_HEADERS = {
       "Content-Type": "application/json",
@@ -135,6 +137,7 @@ onVerificationTimeout: 'HERE_ON_QR_TIMEOUT_FUNCTION'
     let _apiKey = null;
     let _qrContainerSelector = null;
     let _qrContainer = null;
+    let _logContainer = null;
     let _apiBaseUrl = DEFAULT_API_BASE_URL;
     let _onVerificationSuccessCallback = null;
     let _onVerificationFailureCallback = null;
@@ -156,6 +159,7 @@ onVerificationTimeout: 'HERE_ON_QR_TIMEOUT_FUNCTION'
       return fetch(url, requestData)
         .then((response) => response.json())
         .then((data) => {
+          _logFetchedData(url, method, body, data);
           return data;
         })
         .catch((error) => {
@@ -205,6 +209,7 @@ onVerificationTimeout: 'HERE_ON_QR_TIMEOUT_FUNCTION'
       _onVerificationTimeoutCallback = options.onVerificationTimeout;
       _qrContainerSelector = options.qrContainerSelector;
       _qrContainer = document.querySelector(options.qrContainerSelector);
+      _logContainer = document.querySelector(options.logContainerSelector);
       if (options.apiBaseUrl) {
         _apiBaseUrl = options.apiBaseUrl;
       }
@@ -219,14 +224,43 @@ onVerificationTimeout: 'HERE_ON_QR_TIMEOUT_FUNCTION'
         navigator.userAgent
       );
       const qrCodeHtml = `
-            <div class="w-100 h-100" id="qr-code" style="cursor:pointer; text-align: center;">
-                <img src="${qrCodeUrl}" style="width:100%;height:100%;" alt="Age Verification QR Code" />
-            </div>
-        `;
+          <div class="w-100 h-100" id="qr-code" style="cursor:pointer; text-align: center;">
+              <img src="${qrCodeUrl}" style="width:100%;height:100%;" alt="Age Verification QR Code" />
+          </div>
+      `;
       _qrContainer.innerHTML = qrCodeHtml;
       document.getElementById("qr-code").addEventListener("click", () => {
         window.open(deepUrl, "_blank");
       });
+    };
+    const _logFetchedData = (url, method, body, data) => {
+      if (_logContainer) {
+        const formatData = (data, depth = 0) => {
+          const indent = "&nbsp;".repeat(depth * 4);
+          return Object.entries(data)
+            .map(([key, value]) => {
+              if (typeof value === "object" && value !== null) {
+                return `${indent}${key}: {<br>${formatData(
+                  value,
+                  depth + 1
+                ).replace(/\n/g, "<br>")}<br>${indent}}`;
+              } else {
+                return `${indent}${key}: ${value}`;
+              }
+            })
+            .join("<br>");
+        };
+        const filteredData = Object.keys(data)
+          .filter((key) => key === "scanningState" || key === "userInfo")
+          .reduce((obj, key) => {
+            obj[key] = data[key];
+            return obj;
+          }, {});
+        const formattedData = formatData(filteredData);
+        const logEntry = document.createElement("div");
+        logEntry.innerHTML = `${formattedData}<br><br>`;
+        _logContainer.prepend(logEntry);
+      }
     };
     const _buildUrl = (endpoint) => {
       return `${_apiBaseUrl}${endpoint}`;
@@ -343,6 +377,7 @@ onVerificationTimeout: 'HERE_ON_QR_TIMEOUT_FUNCTION'
     window.bitAgeVerification.configure({
       apiKey: queryParams.apiKey,
       qrContainerSelector: "#bit-age-verification-qr",
+      logContainerSelector: "#bit-age-verification-logs",
       onVerificationSuccess: function () {
         console.log("Verification success");
         window.callbackModule._handleState(window.callbackModule.STATES.Approved);
